@@ -1,86 +1,86 @@
-# Detetor de phishing a partir do URL
+# Phishing URL Detector
 
-Modelo de machine learning que recebe um URL e diz se é phishing, usando **apenas o texto do URL** (não visita a página).
+A machine learning model that takes a URL and predicts whether it is phishing, using **only the URL text** (it never visits the page).
 
-Projeto de portefólio em IA + cibersegurança. Fase atual: baseline em notebook, com teste num dataset externo.
+Portfolio project in AI + cybersecurity. Current stage: baseline in a notebook, validated on an external dataset.
 
-## Como funciona
+## How it works
 
 ```
-URL → extrair_features() → 12 pistas numéricas → XGBoost → phishing / legítimo
+URL → extrair_features() → 12 numeric features → XGBoost → phishing / legitimate
 ```
 
-**Pistas extraídas do URL:**
+**Features extracted from the URL** (code names are in Portuguese):
 
-| Pista | O que mede |
+| Feature | What it measures |
 |---|---|
-| `comprimento` | Número de caracteres do URL |
-| `n_pontos` | Pontos no domínio (muitos subdomínios é suspeito) |
-| `n_hifenes` | Hífenes no domínio (ex.: `paypal-secure-login.com`) |
-| `n_digitos` | Dígitos no URL |
-| `tem_https` | Usa HTTPS |
-| `tem_arroba` | Tem `@` (tudo o que vem antes é ignorado pelo browser) |
-| `tem_ip` | O domínio é um endereço IP |
-| `tem_login` | Contém a palavra "login" |
-| `entropia` | Aleatoriedade do domínio (domínios gerados ao acaso têm entropia alta) |
-| `n_palavras_suspeitas` | Palavras como "verify", "secure", "account", "update", "bank" |
-| `tem_porta` | Indica uma porta explícita (ex.: `:8080`) |
-| `marca_falsa` | Menciona uma marca conhecida (PayPal, CTT, …) num domínio que não é o dela |
+| `comprimento` | URL length in characters |
+| `n_pontos` | Dots in the domain (many subdomains is suspicious) |
+| `n_hifenes` | Hyphens in the domain (e.g. `paypal-secure-login.com`) |
+| `n_digitos` | Digits in the URL |
+| `tem_https` | Uses HTTPS |
+| `tem_arroba` | Contains `@` (the browser ignores everything before it) |
+| `tem_ip` | The domain is an IP address |
+| `tem_login` | Contains the word "login" |
+| `entropia` | Randomness of the domain (randomly generated domains have high entropy) |
+| `n_palavras_suspeitas` | Words like "verify", "secure", "account", "update", "bank" |
+| `tem_porta` | Has an explicit port (e.g. `:8080`) |
+| `marca_falsa` | Mentions a known brand (PayPal, CTT, …) on a domain that isn't theirs |
 
-Antes de extrair as pistas, o URL é normalizado: o `www.` é removido (ver *O que descobri*).
+Before extracting the features, the URL is normalized: the `www.` prefix is removed (see *Findings*).
 
-## Dados
+## Data
 
-- **Treino:** [PhiUSIIL](https://archive.ics.uci.edu/dataset/967/phiusiil+phishing+url+dataset) (UCI, id 967). São 235.795 URLs, dos quais 134.850 legítimos e 100.945 phishing. Divisão 80/20 estratificada.
-- **Teste externo:** [PhishBench-External](https://data.mendeley.com/datasets/2ctjcnm9kn) (Mendeley). São 1.000 URLs de julho de 2025: 500 phishing (PhishTank) e 500 legítimos (Tranco). O modelo nunca viu estes dados.
+- **Training:** [PhiUSIIL](https://archive.ics.uci.edu/dataset/967/phiusiil+phishing+url+dataset) (UCI, id 967). It has 235,795 URLs: 134,850 legitimate and 100,945 phishing. Stratified 80/20 split.
+- **External test:** [PhishBench-External](https://data.mendeley.com/datasets/2ctjcnm9kn) (Mendeley). It has 1,000 URLs from July 2025: 500 phishing (PhishTank) and 500 legitimate (Tranco). The model never saw this data.
 
-## Resultados (accuracy)
+## Results (accuracy)
 
-| Modelo | PhiUSIIL (teste) | Externo |
+| Model | PhiUSIIL (test) | External |
 |---|---|---|
-| Original | 0,97 | **0,46** |
-| Com URL normalizado (sem `www.`) | 0,98 | **0,96** |
-| Normalizado e sem a pista `tem_https` | 0,95 | 0,94 |
+| Original | 0.97 | **0.46** |
+| Normalized URL (no `www.`) | 0.98 | **0.96** |
+| Normalized, without the `tem_https` feature | 0.95 | 0.94 |
 
-Modelo final (normalizado), no teste externo:
+Final model (normalized), on the external test:
 
 | | precision | recall |
 |---|---|---|
-| legítimo | 0,93 | 1,00 |
-| phishing | 1,00 | 0,92 |
+| legitimate | 0.93 | 1.00 |
+| phishing | 1.00 | 0.92 |
 
-Matriz de confusão: 499 legítimos certos e 1 falso alarme; 461 phishing apanhados e 39 falhados.
+Confusion matrix: 499 legitimate correct and 1 false alarm; 461 phishing caught and 39 missed.
 
-## O que descobri
+## Findings
 
-**1. O modelo aprendeu o `www.` e não o phishing.**
-No dataset de treino, a accuracy era de 97%. No dataset externo caiu para **46%**, pior do que o acaso: o modelo marcava quase todos os sites legítimos como phishing.
+**1. The model learned `www.`, not phishing.**
+Accuracy on the training dataset was 97%. On the external dataset it dropped to **46%**, worse than chance: the model flagged almost every legitimate site as phishing.
 
-A causa: no PhiUSIIL, **100%** dos URLs legítimos começam por `www.`, contra 42% dos de phishing. O modelo aprendeu a regra "sem `www.` → phishing". No dataset externo, só 0,2% dos legítimos têm `www.`, e a regra falha.
+The cause: in PhiUSIIL, **100%** of legitimate URLs start with `www.`, compared to 42% of phishing URLs. The model learned the rule "no `www.` → phishing". In the external dataset, only 0.2% of legitimate URLs have `www.`, so the rule breaks.
 
-Removendo o `www.` antes de extrair as pistas, a accuracy no externo subiu de **0,46 para 0,96**.
+Removing `www.` before extracting features raised external accuracy from **0.46 to 0.96**.
 
-**2. O HTTPS é um sinal forte, mas o modelo não depende só dele.**
-A pista `tem_https` tem ~93% da importância. Nos dois datasets, 100% dos legítimos usam HTTPS, e o phishing usa-o em 49% (PhiUSIIL) e 85% (externo). No PhiUSIIL, **todos** os URLs sem HTTPS são phishing, por isso basta essa pergunta para classificar metade do phishing. Sem esta pista, o modelo continua com 0,94 no externo, por isso as restantes pistas fazem quase todo o trabalho.
+**2. HTTPS is a strong signal, but the model doesn't rely on it alone.**
+The `tem_https` feature accounts for ~93% of the importance. In both datasets, 100% of legitimate URLs use HTTPS, while phishing uses it 49% of the time (PhiUSIIL) and 85% (external). In PhiUSIIL, **every** URL without HTTPS is phishing, so that single question classifies half of the phishing URLs. Without this feature, the model still reaches 0.95 on PhiUSIIL and 0.94 on the external set, so the remaining features generalize well.
 
-Mantive a pista porque a regra "sem HTTPS → suspeito" faz sentido no mundo real. Mesmo assim, a maioria do phishing atual já usa HTTPS, e para esses casos ela não ajuda.
+I kept the feature because "no HTTPS → suspicious" makes sense in the real world. Still, most current phishing already uses HTTPS, and the feature doesn't help in those cases.
 
-**Lição:** um resultado alto no próprio dataset não prova nada. É preciso testar em dados de outra fonte.
+**Lesson:** a high score on the training dataset proves nothing. You need to test on data from a different source.
 
-## Limitações
+## Limitations
 
-- **Teste externo provavelmente otimista:** os legítimos do Tranco são só páginas iniciais (`https://dell.com`), curtas e sem caminho. URLs legítimos reais costumam ter caminhos longos (`dell.com/support/...`), e o modelo pode confundi-los com phishing.
-- **Teste externo pequeno:** são só 1.000 URLs.
-- **Só olha para o texto do URL:** não deteta phishing alojado em domínios legítimos comprometidos ou em serviços como Weebly e Wix sem sinais óbvios no URL.
-- **Sem split temporal:** treino e teste do PhiUSIIL são da mesma época. O phishing muda depois e o modelo envelhece.
-- **Sem robustez adversarial:** não trata typosquatting (`paypa1.com`) nem homóglifos (`раypal.com` com letras cirílicas).
-- **Lista de marcas limitada:** a pista `marca_falsa` só conhece 15 marcas.
+- **External test is probably optimistic:** the Tranco legitimate URLs are homepages only (`https://dell.com`), short and without a path. Real legitimate URLs often have long paths (`dell.com/support/...`), and the model may confuse them with phishing.
+- **Small external test:** only 1,000 URLs.
+- **Only looks at the URL text:** it can't detect phishing hosted on compromised legitimate domains or on services like Weebly and Wix when the URL shows no obvious signs.
+- **No temporal split:** PhiUSIIL train and test come from the same period. Phishing changes over time and the model ages.
+- **No adversarial robustness:** it doesn't handle typosquatting (`paypa1.com`) or homoglyphs (`раypal.com` with Cyrillic letters).
+- **Limited brand list:** the `marca_falsa` feature only knows 15 brands.
 
-## Privacidade
+## Privacy
 
-O modelo só precisa do texto do URL e não visita a página. Isto permite, no futuro, corrê-lo **localmente no browser**, sem enviar o histórico de navegação para nenhum servidor.
+The model only needs the URL text and never visits the page. This makes it possible, in the future, to run it **locally in the browser** without sending browsing history to any server.
 
-## Como correr
+## How to run
 
 ```bash
 git clone https://github.com/tomasmp12/phishing-detector.git
@@ -90,11 +90,11 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-1. O dataset de treino é descarregado automaticamente pelo notebook (`ucimlrepo`).
-2. Para o teste externo, descarrega o CSV do PhishBench-External e guarda-o como `data/phishbench_external.csv`.
-3. Abre `notebooks/01_baseline.ipynb` e corre as células **por ordem**.
+1. The training dataset is downloaded automatically by the notebook (`ucimlrepo`).
+2. For the external test, download the PhishBench-External CSV and save it as `data/phishbench_external.csv`.
+3. Open `notebooks/01_baseline.ipynb` and run the cells **in order**.
 
-O modelo treinado está em `models/xgb_phishing.json`. Para o carregar:
+The trained model is in `models/xgb_phishing.json`. To load it:
 
 ```python
 from xgboost import XGBClassifier
@@ -102,17 +102,17 @@ model = XGBClassifier()
 model.load_model("models/xgb_phishing.json")
 ```
 
-## Estrutura
+## Project structure
 
 ```
 phishing-detector/
-├── notebooks/01_baseline.ipynb   # todo o trabalho: dados, pistas, treino, avaliação
-├── models/xgb_phishing.json      # modelo treinado
-├── data/                         # datasets (não incluídos no git)
+├── notebooks/01_baseline.ipynb   # all the work: data, features, training, evaluation
+├── models/xgb_phishing.json      # trained model
+├── data/                         # datasets (not tracked by git)
 └── requirements.txt
 ```
 
-## Próximos passos
+## Next steps
 
-1. **Demo:** API em FastAPI e página web.
-2. **Versão a sério:** split temporal, pistas do conteúdo HTML, robustez contra typosquatting e homóglifos, MLOps (CI, Docker, monitorização de drift) e uma extensão de browser com o modelo local em ONNX.
+1. **Demo:** FastAPI API and web page.
+2. **Production version:** temporal split, HTML content features, robustness against typosquatting and homoglyphs, MLOps (CI, Docker, drift monitoring) and a browser extension running the model locally with ONNX.
